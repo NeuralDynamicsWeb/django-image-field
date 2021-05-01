@@ -37,7 +37,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'image'
+    'django_image_field',
+    'multiselectfield',
 ]
 
 MIDDLEWARE = [
