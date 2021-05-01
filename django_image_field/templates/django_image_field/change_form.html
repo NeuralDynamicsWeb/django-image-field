@@ -1,0 +1,252 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/4.0.1/dropzone.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/dropzone/4.0.1/min/basic.min.css" rel="stylesheet" />
+    <link href="{% static "css/change_form.css" %}?v=1.2" rel="stylesheet">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <script type="text/javascript" src="{% static "admin/js/vendor/jquery/jquery.js" %}"></script>
+    <script type="text/javascript" src="{% static "admin/js/jquery.init.js" %}"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/4.0.1/dropzone.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+    <script type="text/javascript" src="{% static 'admin/js/vendor/jquery/jquery.js' %}"></script>
+    <script type="text/javascript" src="{% static 'admin/js/jquery.init.js' %}"></script>
+    <script>
+        const model = "{{ model }}";
+        const model_id = "{{ request.resolver_match.kwargs.object_id }}";
+        const csrf_token = "{{ csrf_token }}";
+
+        function block_or_unblock_uploading(dropzone_content) {
+            content = dropzone_content.find('.dz-size');
+            console.log(content.length);
+            if(model=='manager'||model=='article'||model=='seo_page'){
+                if (content.length>0) {
+                    $("#id_images").prop('disabled', true);
+                } else {
+                    $("#id_images").prop('disabled', false);
+                }
+            }
+        }
+
+        function generate_slug() {
+
+            const update_data = new FormData();
+            title=$("#id_title").val();
+            update_data.set('title', title);
+            fetch("/generate_slug/",
+            {
+                method:'POST',
+                mode: 'same-origin',
+                headers:{
+                    "X-CSRFToken": csrf_token 
+                },
+                body:update_data
+            })
+            .then(response => response.json())
+            .then((data) => {
+                $(".vTextField").val(data.slug)
+            })
+            .catch((reason) => {
+                alert(reason);
+            });
+        };
+
+        function reorder_images(order){
+            const update_data = new FormData();
+            update_data.append('order', order);
+            fetch("/images/reorder_images",
+            {
+                method:'POST',
+                mode: 'same-origin',
+                headers:{
+                    "X-CSRFToken": csrf_token 
+                },
+                body:update_data
+            })
+            .then(response => response.json())
+            .catch((reason) => {
+                alert(reason);
+            });
+        }
+
+        function change_size_of_static_page_fields(){
+            $("#staticpage_form :input[name='seo_title']").css({'font-size': '14px'});
+            $("#staticpage_form :input[name='seo_description']").css({'font-size': '14px'});
+            $("#staticpage_form :input[name='seo_keywords']").css({'font-size': '14px'});
+            $("#staticpage_form :input[name='head']").css({'font-size': '14px'});
+            $("#staticpage_form :input[name='content']").css({'font-size': '14px'});
+        };
+
+        function group_scroller(){
+            $("#id_permissions").css({
+                'overflow-y': 'scroll',
+                'max-height': '350px'
+            });
+        }
+
+        function change_size_in_seo(){
+            $("#seopage_form :input[name='title']").attr("size", 100);
+            $("#seopage_form :input[name='url']").attr("size", 100);
+            $("textarea").css({'font-size': '14px'});
+        };
+
+        function change_size_in_seofilter(){
+            $("#seofilter_form :input[name='shortcut']").attr("size", 55);
+        };
+
+        function count_symbols(type){
+            object=$("#seopage_form :input[name='" + type + "']");
+            $("#" + type + "_counter").remove();
+
+            $(".form-row.field-" + type + " div").append(
+            "<a id=" + type + "_counter class=form-row>"+ 
+            "Набрано символов: " + object.val().length +
+            "</a>")
+
+            $("#" + type + "_counter").css({
+                "margin-top": "10px",
+                "margin-left": "160px"
+            });
+        };
+
+        function title_block_size(){
+            $("#id_title").attr("size", 50);
+        }
+
+        function remove_duplicate_errors(){
+            errors=$(".field-title .errorlist li").last().remove();
+        }
+
+        try {
+            Dropzone.autoDiscover = false;
+        } catch (ReferenceError) {}
+
+        django.gettext = window.gettext;
+
+        $(document).ready(function() {
+            //SEO fields change
+            try{
+                group_scroller();
+                title_block_size();
+                change_size_in_seo();
+                remove_duplicate_errors();
+                change_size_in_seofilter();
+                change_size_of_static_page_fields();
+            } catch {};
+
+            try {
+                count_symbols("title");
+                count_symbols("description");
+            } catch {};
+
+            $("#seopage_form :input[name='title']").on("keyup change", function() {
+                count_symbols("title");
+            });
+
+            $("#seopage_form :input[name='description']").on("keyup change", function() {
+                count_symbols("description");
+            });
+
+            const file_input = $('input[name=images]');
+            if (file_input && model_id) {
+                const dropzone_container = $(`<div class="uploadzone"></div>`);
+                const dropzone_content = $('<div class="uploadzone-content dropzone"></div>');
+                dropzone_container.append(dropzone_content);
+                file_input.parent().parent().append(dropzone_container);
+
+                let uploadMultipleFiles=null;
+                // set max files to 1 for manager admin form
+                if (model=='manager' || model=='article' || model=='seo_page')  uploadMultipleFiles=1;
+                const dropzone = new Dropzone(file_input[0], {
+                    url: "/images/create",
+                    headers: {
+                        'X-CSRFToken': csrf_token
+                    },
+                    parallelUploads: 1,
+                    acceptedFiles: 'image/*',
+                    previewsContainer: dropzone_content[0],
+                    addRemoveLinks: true,
+                    dictRemoveFile: "Удалить",
+                    maxFiles:uploadMultipleFiles,
+                    clickable:true,
+                    init: function () {
+                        // hide row with existing images and upload it to dropzone
+                        $(".field-_images").find('img')
+                            .each((id, image) => {
+                                const curr_image = $(image);
+                                const mockFile = { name: curr_image.data('name'), 
+                                                size: curr_image.data('size'), 
+                                                type: `image/${curr_image.data('type')}`, 
+                                                serverID: curr_image.data('id'), 
+                                                accepted: true };
+                                this.emit("addedfile", mockFile);
+                                this.createThumbnailFromUrl(mockFile, curr_image.attr('src'));
+                                this.emit("complete", mockFile);
+                                this.files.push(mockFile);
+                                $(mockFile.previewElement).attr('id', curr_image.data('id'));
+                                $(mockFile.previewElement).attr('order', curr_image.data('order'));
+                            });
+                        $(".field-_images").hide();
+                        dropzone_content.find('.dz-size').hide();
+                        block_or_unblock_uploading(dropzone_content);
+                    }
+                });
+
+                dropzone.on("sending", function(file, xhr, formData) { 
+                    const index = dropzone.files.map(function (obj, index)
+                            {if(file == obj){return index;}}).filter(isFinite)[0];
+                    if (model!='manager' && model!='article') {
+                        formData.append("apply_watermark", true)
+                    };
+                    formData.append("image_index", index);  
+                    formData.append("model",model);
+                    formData.append("model_id",model_id);
+                });
+
+                dropzone.on('success', function(file, response){
+                    dropzone_content.find('.dz-remove').each((idx,remove_button)=>{
+                        $(remove_button).addClass('deletelink');
+                    });
+                    dropzone_content.find('.dz-details').hide();
+                    $(file.previewElement).attr('id', response.id);
+                    block_or_unblock_uploading(dropzone_content);
+                });
+
+                dropzone.on('removedfile', function(file){
+                    const update_data = new FormData();
+                    update_data.set('model',model);
+                    update_data.set('current_id',$(file.previewElement).attr('id'));
+                    fetch("/images/delete",
+                    {
+                        method:'POST',
+                        mode: 'same-origin',
+                        headers:{
+                            "X-CSRFToken": csrf_token
+                        },
+                        body:update_data
+                    })
+                    .then(response => response.json())
+                    .catch((reason) => {
+                        alert(reason);
+                    })
+                    block_or_unblock_uploading(dropzone_content);
+                })
+                const sortable_zone = $(".uploadzone-content")
+                .sortable({
+                    stop : function(event, ui){
+                        reorder_images(sortable_zone.sortable( "toArray" ));
+                    }
+                });
+
+            }else{
+                file_input.hide();
+                $('.field-images').hide();
+                $('.field-_images').hide();
+            }
+
+        });
+        
+    </script>
+{% endblock %}
